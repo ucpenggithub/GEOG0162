@@ -1,0 +1,50 @@
+---
+title: "merge"
+output: html_document
+date: "2023-01-24"
+---
+```{r}
+library(spatstat)
+library(here)
+library(sp)
+library(rgeos)
+library(maptools)
+library(tmap)
+library(sf)
+library(geojson)
+library(geojsonio)
+library(tmaptools)
+library(janitor)
+library(spatialreg)
+library(tidyverse)
+library(readxl)
+library(spdep)
+library(plotly)
+# load dependencies
+library(biscale)
+library(rstudioapi)
+library(magrittr) # pipes
+library(lintr) 
+library(raster) 
+library(viridis)
+library(cowplot) 
+library(xlsx)
+```
+
+```{r}
+
+IMDScore <- read.csv(here::here("WK3","English IMD 2019 Domains rebased for London by CDRC.csv"))
+
+FVI <- read.csv(here::here("WK3","Financial Vulnerability.csv"))
+
+IMD2019 <- read.csv(here::here("WK3","London2019IMD.csv"))
+
+merge1 <- merge(IMDScore,FVI,by.x = "ls11cd", by.y = "LSOA11CD")
+
+merge2 <- merge(merge1,IMD2019,by.x = "ls11cd", by.y = "LSOA11CD")
+
+```
+
+
+
+

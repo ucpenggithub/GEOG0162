@@ -1,0 +1,338 @@
+---
+title: "Test2"
+output: html_document
+date: "2023-01-24"
+---
+```{r}
+library(spatstat)
+library(tidyverse)
+library(here)
+library(sp)
+library(rgeos)
+library(maptools)
+library(tmap)
+library(sf)
+library(geojson)
+library(geojsonio)
+library(tmaptools)
+library(janitor)
+library(spatialreg)
+library(ggplot2)
+library(readxl)
+library(spdep)
+library(plotly)
+# load dependencies
+library(biscale)
+library(rstudioapi)
+library(magrittr) # pipes
+library(lintr) 
+library(raster) 
+library(viridis)
+library(cowplot) 
+library(ggpubr)
+library(htmlwidgets)
+```
+
+```{r}
+# Use read_sf() function to load shape file 
+# Use read_sf() function to load shape file 
+LSOAshp <- read_sf(here::here("Week3","London LSOA Areas.shp"))
+BOROUGHshp <- read_sf(here::here("Week3","London Borough Areas.shp"))
+# Generate an empty map to visualise the spatial configuration and hierarchy of LSOA and Boroughs
+# First add LSOA layer 
+# Generate an empty map to visualise the spatial configuration and hierarchy of LSOA and Boroughs
+# First add LSOA layer 
+tm_shape(LSOAshp) + tm_polygons() +
+# Add Borough layer on top of LSOA layer and make it transparent with alpha = 0
+tm_shape(BOROUGHshp) + tm_polygons(alpha = 0, border.alpha = 1, border.col = "black") +
+# Apply cosmetics by adding compass and scale
+tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom"))
+```
+
+
+```{r}
+datafile <- read.csv(here::here("WK3","IMDFVI.csv"))
+
+# Merge datafile to LSOAshp uniquely by using "LSOACODE column
+spatialdatafile <- merge(LSOAshp, datafile, by.x = "LSOACODE", by.y = "LSOA11")
+class(spatialdatafile)
+#data <- bi_class(spatialdatafile, x = AVEPRICE, y = AVEINCOME, style = "quantile", dim = 3)
+```
+
+```{r}
+theme_map <- function(...) 
+  theme_minimal() +
+  theme(
+    text = element_text(color = "#666666"),
+    # remove all axes
+    axis.line = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    # add a subtle grid
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # background colors
+    plot.background = element_rect(fill = "#F1EAEA",
+                                   color = NA),
+    panel.background = element_rect(fill = "#F1EAEA",
+                                    color = NA),
+    legend.background = element_rect(fill = "#F1EAEA",
+    
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 9, hjust = 0,
+                               color = "#666666"),
+    plot.title = element_text(size = 15, hjust = 0.5,
+                              color = "#666666"),
+    plot.subtitle = element_text(size = 10, hjust = 0.5,
+                                 color = "#666666",
+                                 margin = margin(b = -0.1,
+                                                 t = -0.1,
+                                                 l = 2,
+                                                 unit = "cm"),
+                                 debug = F),
+    # captions
+    plot.caption = element_text(size = 7,
+                                hjust = .5,
+                                margin = margin(t = 0.2,
+                                                b = 0,
+                                                unit = "cm"),
+                                color = "#939184"),
+    ...
+    ))
+
+```
+
+```{r}
+spatialdatafile$IMDScore %>% 
+  quantile(probs = seq (0,1, length.out = 7)) %>% 
+  as.vector() -> quantiles
+imap_chr(quantiles, function(., idx){
+  return(paste0(round(quantiles[idx]/10,0),
+                "0", 
+                "-", 
+                round(quantiles[idx+1]/10,0), "0"))
+}) -> labels
+labels[1:length(labels) - 1] -> labels
+```
+
+```{r}
+spatialdatafile %>% 
+  mutate(
+    IMDScore_quantiles = cut(IMDScore, 
+                         breaks = quantiles,
+                         labels = labels,
+                         include.lowest = T)) -> spatialdatafile
+```
+
+```{r}
+spatialdatafile %>% 
+  ggplot()+
+  geom_sf(aes(fill = IMDScore_quantiles), colour = "black", size = 0.1)+
+  scale_fill_viridis(
+    option = "magma",
+    "IMDScore",
+    alpha = 0.8,
+    begin = 0.1,
+    end = 0.9,
+    discrete = T,
+    direction = 1,
+    guide = guide_legend(
+      keyheight = unit(5, units = "mm"),
+      title.position = "top",
+      reverse = T
+    )
+  )+
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "IMDScore in London (LSOA)",
+    caption = "by :Seminar 3 Group 3\n IMDScore in London"
+  )+
+  theme_map() -> DistPOPChoropleth
+ggsave(filename = "MAP_districtPopulation.png", plot = DistPOPChoropleth, device = png())
+
+```
+```{r}
+DistPOPChoropleth
+```
+```{r}
+ggplotly(DistPOPChoropleth)
+saveWidget(ggplotly(DistPOPChoropleth),file="IMDScore.html")
+```
+
+```{r}
+spatialdatafile$FVR %>% 
+  quantile(probs = seq (0,1, length.out = 7)) %>% 
+  as.vector() -> quantiles
+imap_chr(quantiles, function(., idx){
+  return(paste0(round(quantiles[idx]/1000,0),
+                "K", 
+                "-", 
+                round(quantiles[idx+1]/1000,0), "K"))
+}) -> labels
+labels[1:length(labels) - 1] -> labels
+```
+
+```{r}
+spatialdatafile %>% 
+  mutate(
+    FVR_quantiles = cut(FVR, 
+                         breaks = quantiles,
+                         labels = labels,
+                         include.lowest = T)) -> spatialdatafile
+```
+
+```{r}
+spatialdatafile %>% 
+  ggplot()+
+  geom_sf(aes(fill = FVR_quantiles), colour = "#9ECAE1", size = 0.1)  +
+  scale_fill_viridis(
+    option = "turbo",
+    "Financial Vulnerability Rank",
+    alpha = 0.8,
+    begin = 0.1,
+    end = 0.9,
+    discrete = T,
+    direction = 1,
+    guide = guide_legend(
+      keyheight = unit(5, units = "mm"),
+      title.position = "top",
+      reverse = T
+    )
+  )+
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "Financial Vulnerability Rank in London (LSOA)",
+    caption = "by :Seminar 3 Group 3\n Financial Vulnerability Rank"
+  )+
+  theme_map() -> DistPOPChoropleth1
+ggsave(filename = "MAP_districtPopulation1.png", plot = DistPOPChoropleth1, device = png())
+```
+
+```{r}
+DistPOPChoropleth1
+
+```
+```{r}
+ggplotly(DistPOPChoropleth1)
+saveWidget(ggplotly(DistPOPChoropleth1),file="FVR.html")
+```
+
+```{r}
+# create 3 buckets for Area
+spatialdatafile$FVR %>%
+  quantile(probs = seq(0, 1, length.out = 4)) -> quantiles_FVR
+
+# create 3 buckets for Area
+spatialdatafile$IMDScore %>%
+  quantile(probs = seq(0, 1, length.out = 4)) -> quantiles_IMDScore
+
+# create color scale that encodes two variables
+# red for Area and blue for POP
+# the special notation with gather is due to readibility reasons
+bivariate_color_scale <- tibble(
+  "3 - 3" = "#3F2949", # high inequality, high income
+  "2 - 3" = "#435786",
+  "1 - 3" = "#4885C1", # low inequality, high income
+  "3 - 2" = "#77324C",
+  "2 - 2" = "#806A8A", # medium inequality, medium income
+  "1 - 2" = "#89A1C8",
+  "3 - 1" = "#AE3A4E", # high inequality, low income
+  "2 - 1" = "#BC7C8F",
+  "1 - 1" = "#CABED0" # low inequality, low income
+) %>%
+  gather("group", "fill")
+
+```
+
+
+```{r}
+# cut into groups defined above and join fill
+spatialdatafile %<>%
+  mutate(
+    FVR_quantiles = cut(
+      FVR,
+      breaks = quantiles_FVR,
+      include.lowest = TRUE
+    ),
+    IMDScore_quantiles = cut(
+      IMDScore,
+      breaks = quantiles_IMDScore,
+      include.lowest = TRUE
+    ),
+    # by pasting the factors together as numbers we match the groups defined
+    # in the tibble bivariate_color_scale
+    group = paste(
+      as.numeric(FVR_quantiles), "-",
+      as.numeric(IMDScore_quantiles)
+    )
+  ) %>%
+  # we now join the actual hex values per "group"
+  # so each municipality knows its hex value based on the his gini and avg
+  # income value
+  left_join(bivariate_color_scale, by = "group")
+```
+
+```{r}
+map <- ggplot(
+  # use the same dataset as before
+  data = spatialdatafile
+  ) +
+  
+  # color municipalities according to their gini / income combination
+  geom_sf(
+    aes(
+      fill = fill
+    ),
+    # use thin white stroke for municipalities
+    color = "#CABED0",
+    size = 0.1
+  ) +
+  scale_fill_identity()+
+  # add titles
+  labs(x = NULL,
+         y = NULL,
+         caption = "by : Seminar 3 Group 3 \n Social inequality in London-FVR and IMDScore") +
+  # add the theme
+  theme_map()
+```
+
+```{r}
+# separate the groups
+bivariate_color_scale %<>%
+  separate(group, into = c("FVR", "IMDScore"), sep = " - ") %>%
+  mutate(Area = as.integer(FVR),
+         Pop = as.integer(IMDScore))
+
+legend <- ggplot() +
+  geom_tile(
+    data = bivariate_color_scale,
+    mapping = aes(
+      x = FVR,
+      y = IMDScore,
+      fill = fill)
+  ) +
+  scale_fill_identity() +
+  labs(x = "Larger FVR--->",
+       y = "Higher IMDScore--->") +
+  theme_map() +
+  # make font small enough
+  theme(
+    axis.title = element_text(size = 6)
+  ) +
+  # quadratic tiles
+  coord_fixed()
+```
+
+```{r}
+ggdraw() +
+  draw_plot(map, 0, -0.02, 1.05, 1.05) +
+  draw_plot(legend,0.125, 0.075, 0.225, 0.225) -> Biharbivariate
+```
+```{r}
+Biharbivariate
+```
+
+
